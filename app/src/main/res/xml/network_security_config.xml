@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- National Rail's live departure board is only served over plain HTTP. -->
+    <!-- National Rail's live departure board is served over plain HTTP across nationalrail.co.uk subdomains. -->
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">m.nationalrail.co.uk</domain>
+        <domain includeSubdomains="true">nationalrail.co.uk</domain>
     </domain-config>
 </network-security-config>

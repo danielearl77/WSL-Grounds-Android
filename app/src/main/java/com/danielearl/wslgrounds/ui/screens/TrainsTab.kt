@@ -9,9 +9,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import android.util.Log
 import com.danielearl.wslgrounds.R
 import com.danielearl.wslgrounds.data.Team
 
+private const val TAG = "TrainsTab"
 private const val NO_STATION_CODE = "XXX"
 
 /** Port of TeamTrainViewController: a live National Rail departure board for the team's station. */
@@ -28,6 +30,7 @@ fun TrainsTab(team: Team) {
         }
     } else {
         val url = "http://m.nationalrail.co.uk/pj/ldbboard/dep/${team.stationCode}"
+        Log.d(TAG, "Runtime URL: $url")
         WebViewScreen(url = url, allowInAppBack = true)
     }
 }

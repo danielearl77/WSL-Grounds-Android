@@ -2,7 +2,12 @@ package com.danielearl.wslgrounds.ui.screens
 
 import android.annotation.SuppressLint
 import android.net.http.SslError
+import android.webkit.CookieManager
 import android.webkit.SslErrorHandler
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
@@ -52,21 +57,100 @@ fun WebViewScreen(url: String, allowInAppBack: Boolean) {
             factory = { context ->
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                    settings.javaScriptCanOpenWindowsAutomatically = true
+
+                    // Remove embedded WebView identifier flags so servers (like National Rail) don't reject the request with Error 55
+                    val defaultUserAgent = settings.userAgentString
+                    if (defaultUserAgent != null) {
+                        settings.userAgentString = defaultUserAgent
+                            .replace("; wv", "")
+                            .replace(Regex("""Version/\d+\.\d+\s?"""), "")
+                    }
+
+                    val cookieManager = CookieManager.getInstance()
+                    cookieManager.setAcceptCookie(true)
+                    cookieManager.setAcceptThirdPartyCookies(this, true)
+
+                    webChromeClient = WebChromeClient()
+
                     webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView?, finishedUrl: String?) {
                             isLoading = false
                             errorMessage = null
                             canGoBack = view?.canGoBack() ?: false
+
+                            // Inject CSS stylesheet & MutationObserver to permanently hide dark backdrop filters and auto-accept cookie banners
+                            view?.evaluateJavascript(
+                                """
+                                (function() {
+                                    var styleId = 'app-custom-cookie-fix';
+                                    if (!document.getElementById(styleId)) {
+                                        var style = document.createElement('style');
+                                        style.id = styleId;
+                                        style.innerHTML = `
+                                            #onetrust-consent-sdk,
+                                            #onetrust-banner-sdk,
+                                            .onetrust-pc-dark-filter,
+                                            #onetrust-pc-sdk,
+                                            .ot-sdk-row,
+                                            .ot-fade-in,
+                                            #qc-cmp2-container,
+                                            .qc-cmp2-container,
+                                            #cookie-banner,
+                                            .cookie-banner,
+                                            .modal-backdrop,
+                                            div[id*="onetrust"],
+                                            div[class*="onetrust"],
+                                            div[id*="cookie-consent"],
+                                            div[class*="cookie-consent"] {
+                                                display: none !important;
+                                                opacity: 0 !important;
+                                                visibility: hidden !important;
+                                                pointer-events: none !important;
+                                            }
+                                            body, html {
+                                                overflow: auto !important;
+                                                position: static !important;
+                                            }
+                                        `;
+                                        (document.head || document.documentElement).appendChild(style);
+                                    }
+
+                                    function autoDismiss() {
+                                        var btn = document.getElementById('onetrust-accept-btn-handler') ||
+                                                  document.querySelector('.accept-cookies') ||
+                                                  document.querySelector('button[id*="accept"]');
+                                        if (btn) { try { btn.click(); } catch(e) {} }
+                                        var filter = document.querySelector('.onetrust-pc-dark-filter');
+                                        if (filter) { filter.remove(); }
+                                    }
+
+                                    autoDismiss();
+
+                                    if (!window.__cookieObserverInstalled && window.MutationObserver) {
+                                        window.__cookieObserverInstalled = true;
+                                        var observer = new MutationObserver(function() {
+                                            autoDismiss();
+                                        });
+                                        observer.observe(document.documentElement, { childList: true, subtree: true });
+                                    }
+                                })();
+                                """.trimIndent(),
+                                null,
+                            )
                         }
 
                         override fun onReceivedError(
                             view: WebView?,
-                            errorCode: Int,
-                            description: String?,
-                            failingUrl: String?,
+                            request: WebResourceRequest?,
+                            error: WebResourceError?,
                         ) {
-                            isLoading = false
-                            errorMessage = description
+                            if (request?.isForMainFrame == true) {
+                                isLoading = false
+                                errorMessage = error?.description?.toString() ?: "Error loading page"
+                            }
                         }
 
                         override fun onReceivedSslError(

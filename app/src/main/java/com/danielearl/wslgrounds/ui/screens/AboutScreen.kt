@@ -58,7 +58,7 @@ fun AboutScreen(onBack: () -> Unit, onSupportClick: () -> Unit) {
         ) {
             Text(stringResource(R.string.about_body))
             Text(
-                text = "© 2012 - $copyrightYear D. Earl\nVersion Number $versionName",
+                text = "© 2012 - $copyrightYear EJE Software\nVersion Number $versionName",
                 fontWeight = FontWeight.Light,
             )
             Button(onClick = onSupportClick, modifier = Modifier.padding(top = 16.dp)) {
